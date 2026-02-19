@@ -1,0 +1,182 @@
+#include <BLEDevice.h>      // Librería principal para usar Bluetooth BLE
+#include <BLEServer.h>      // Permite crear el servidor BLE
+#include <BLEUtils.h>       // Funciones auxiliares BLE
+#include <BLE2902.h>       // Descriptor BLE (opcional, compatibilidad)
+#include <Adafruit_NeoPixel.h>  // Librería para controlar el LED RGB
+
+// ---------------- CONFIGURACIÓN DEL LED ----------------
+
+#define LED_PIN 48    
+#define NUMPIXELS 1     
+
+Adafruit_NeoPixel pixel(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+
+// ---------------- VARIABLES BLE ----------------
+
+BLECharacteristic *pCharacteristic; // Característica BLE para recibir datos
+bool deviceConnected = false;       // Guarda si el celular está conectado
+
+String colorActual = "OFF";        // Guarda el color actual 
+
+// UUIDs del servicio y característica (identificadores únicos BLE)
+#define SERVICE_UUID        "12345678-1234-1234-1234-1234567890ab"
+#define CHARACTERISTIC_UUID "abcd1234-5678-1234-5678-abcdef123456"
+
+// ---------------- FUNCIÓN QUE SE EJECUTA CUANDO SE RECIBE UN DATO ----------------
+
+class MyCallbacks: public BLECharacteristicCallbacks {
+
+  void onWrite(BLECharacteristic *pCharacteristic) {
+
+    // Obtiene el valor enviado desde el celular
+    String value = pCharacteristic->getValue();
+
+
+    if (value.length() > 0) {
+
+      Serial.print("Recibido: ");
+      Serial.println(value);
+
+      // ---------------- CONTROL DEL LED AZUL ----------------
+      if (value == "AZUL") {
+
+        // Si ya estaba azul, apagar
+        if (colorActual == "AZUL") {
+
+          pixel.setPixelColor(0, pixel.Color(0, 0, 0)); // Apagar LED
+          pixel.show(); // Aplicar cambio físico
+          colorActual = "OFF"; // Guardar estado
+
+        } 
+        else {
+
+          pixel.setPixelColor(0, pixel.Color(0, 0, 255)); // Encender azul
+          pixel.show(); // Aplicar cambio físico
+          colorActual = "AZUL"; // Guardar estado
+
+        }
+
+      }
+
+      // ---------------- CONTROL DEL LED ROJO ----------------
+      else if (value == "ROJO") {
+
+        if (colorActual == "ROJO") {
+
+          pixel.setPixelColor(0, pixel.Color(0, 0, 0)); // Apagar LED
+          pixel.show();
+          colorActual = "OFF";
+
+        } 
+        else {
+
+          pixel.setPixelColor(0, pixel.Color(255, 0, 0)); // Encender rojo
+          pixel.show();
+          colorActual = "ROJO";
+
+        }
+
+      }
+
+      // ---------------- CONTROL DEL LED VERDE ----------------
+      else if (value == "VERDE") {
+
+        if (colorActual == "VERDE") {
+
+          pixel.setPixelColor(0, pixel.Color(0, 0, 0)); // Apagar LED
+          pixel.show();
+          colorActual = "OFF";
+
+        } 
+        else {
+
+          pixel.setPixelColor(0, pixel.Color(0, 255, 0)); // Encender verde
+          pixel.show();
+          colorActual = "VERDE";
+
+        }
+
+      }
+
+      // ---------------- APAGAR LED DESDE APP ----------------
+      else if (value == "OFF") {
+
+        pixel.setPixelColor(0, pixel.Color(0, 0, 0)); // Apagar LED
+        pixel.show();
+        colorActual = "OFF";
+
+      }
+
+    }
+  }
+};
+
+// ---------------- DETECTAR CONEXIÓN BLE ----------------
+
+class MyServerCallbacks: public BLEServerCallbacks {
+
+  void onConnect(BLEServer* pServer) {
+
+    deviceConnected = true; // Cambia estado a conectado
+    Serial.println("Conectado"); 
+
+  };
+
+  void onDisconnect(BLEServer* pServer) {
+
+    deviceConnected = false; // Cambia estado a desconectado
+    Serial.println("Desconectado");
+
+  }
+
+};
+
+// ---------------- CONFIGURACIÓN INICIAL ----------------
+
+void setup() {
+
+  Serial.begin(115200); // Inicia comunicación serial
+
+  // Inicializa el LED
+  pixel.begin();
+  pixel.clear(); // Limpia memoria del LED
+  pixel.show();  // Apaga LED físicamente
+
+  // Inicializa Bluetooth con nombre visible
+  BLEDevice::init("ESP32S3_LED");
+
+  // Crea el servidor BLE
+  BLEServer *pServer = BLEDevice::createServer();
+
+  // Asigna funciones de conexión/desconexión
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  // Crea el servicio BLE
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  // Crea la característica BLE (canal de comunicación)
+  pCharacteristic = pService->createCharacteristic(
+                      CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_WRITE // Permite recibir datos
+                    );
+
+  // Asigna la función que se ejecuta cuando llegan datos
+  pCharacteristic->setCallbacks(new MyCallbacks());
+
+  // Inicia el servicio
+  pService->start();
+
+  // Inicia la publicidad BLE (para que el celular lo encuentre)
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->start();
+
+  Serial.println("BLE listo..."); // Confirmación
+
+}
+
+// ---------------- LOOP PRINCIPAL ----------------
+
+void loop() {
+
+}
